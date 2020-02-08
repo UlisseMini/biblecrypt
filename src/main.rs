@@ -11,7 +11,8 @@
 use std::collections::HashMap;
 use rand::seq::SliceRandom;
 use std::io::{Read, Write};
-
+use rand::rngs::ThreadRng;
+use std::io;
 
 static BIBLE: &'static str = include_str!("the-king-james-bible.txt");
 
@@ -36,7 +37,17 @@ mod tests {
 
     #[test]
     fn test_encrypt_decrypt() {
+        // encrypt
+        let mut bc = BibleCipher::new();
+        let encrypted = bc.encrypt('h' as u8).unwrap();
 
+        // decrypt
+        let mut array = [0; 8];
+        array.copy_from_slice(&encrypted);
+        let decrypted = bc.decrypt(array);
+
+        // assert
+        assert_eq!(decrypted, 'h' as u8);
     }
 }
 
@@ -51,57 +62,77 @@ fn biblemap_new() -> BibleMap {
     map
 }
 
-fn decrypt() -> std::io::Result<()> {
-    for chunk in std::io::stdin()
-            .lock()
-            .bytes()
-            .map(|x| x.unwrap())
-            .collect::<Vec<u8>>()
-            .chunks(8) {
-
-
-        // let chunk = [chunk, &[0,0,0,0]].concat();
-        let mut array = [0; 8];
-        array.copy_from_slice(&chunk);
-
-        let idx: usize = usize::from_le_bytes(array);
-        std::io::stdout().write(&[BIBLE.as_bytes()[idx]]).unwrap();
-    }
-    Ok(())
+struct BibleCipher {
+    map: BibleMap,
+    rng: ThreadRng,
 }
 
-fn encrypt() -> std::io::Result<()> {
-    let map = biblemap_new();
-
-    let mut rng = rand::thread_rng();
-
-    for b in std::io::stdin().lock().bytes() {
-        let b = b?;
-        match map.get(&b) {
-            Some(v) => {
-                let idx = v.choose(&mut rng).unwrap();
-                let bytes = &idx.to_le_bytes();
-                assert_eq!(BIBLE.as_bytes()[*idx], b);
-                std::io::stdout().write(bytes).unwrap();
-            },
-            None => panic!(format!("cannot find char {} in the king james bible", b)),
+impl BibleCipher {
+    fn new() -> BibleCipher {
+        BibleCipher {
+            map: biblemap_new(),
+            rng: rand::thread_rng(),
         }
     }
-    Ok(())
+
+    /// Encrypt b using the bible, if b is not in the bible None will be returned.
+    fn encrypt(&mut self, b: u8) -> Option<[u8; 8]> {
+        match self.map.get(&b) {
+            Some(v) => {
+                let idx = v.choose(&mut self.rng).unwrap();
+                Some(idx.to_le_bytes())
+            },
+            None => None,
+        }
+    }
+
+    fn decrypt(&self, chunk: [u8; 8]) -> u8 {
+        // let chunk = [chunk, &[0,0,0,0]].concat();
+
+        let idx: usize = usize::from_le_bytes(chunk);
+        BIBLE.as_bytes()[idx]
+    }
 }
 
 fn help() {
     println!("Usage: biblecrypt <encrypt/decrypt>")
 }
 
-fn main() {
+fn main() -> io::Result<()> {
     let cmd = std::env::args().skip(1).next();
     match cmd {
         Some(s) => {
-            // TODO: figure out why matching on strings did not work
-            if s == "encrypt" { encrypt().unwrap() }
-            else { decrypt().unwrap() }
+            let mut bc = BibleCipher::new();
+
+            if s == "encrypt" {
+                for b in io::stdin().lock().bytes() {
+                    let b = b?;
+                    match bc.encrypt(b) {
+                        Some(bytes) => {
+                            io::stdout().write(&bytes)?;
+                        },
+                        None => {
+                            // TODO: Move into run() function and return an error here
+                            eprintln!("Could not find {} in the holy bible", b);
+                            return Ok(());
+                        }
+                    }
+                }
+            } else {
+                for chunk in io::stdin()
+                    .lock()
+                    .bytes()
+                    .map(|x| x.unwrap())
+                    .collect::<Vec<u8>>()
+                    .chunks(8) {
+
+                    let mut array = [0; 8];
+                    array.copy_from_slice(&chunk);
+                    bc.decrypt(array);
+               }
+            }
         },
         None => help(),
     };
+    Ok(())
 }
