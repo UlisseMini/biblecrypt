@@ -104,7 +104,7 @@ fn main() -> io::Result<()> {
         Some(s) => {
             let mut bc = BibleCipher::new();
 
-            if s == "encrypt" {
+            if s == "encrypt" || s == "e" || s == "enc" {
                 for b in io::stdin().lock().bytes() {
                     let b = b?;
                     match bc.encrypt(b) {
