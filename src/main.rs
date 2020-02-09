@@ -124,11 +124,13 @@ fn main() -> io::Result<()> {
                     .bytes()
                     .map(|x| x.unwrap())
                     .collect::<Vec<u8>>()
-                    .chunks(8) {
+                    .chunks(4) {
 
                     let mut array = [0; 4];
                     array.copy_from_slice(&chunk);
-                    bc.decrypt(array);
+
+                    let result = bc.decrypt(array);
+                    io::stdout().write(&[result])?;
                }
             }
         },
