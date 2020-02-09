@@ -17,7 +17,7 @@ use std::io;
 static BIBLE: &'static str = include_str!("the-king-james-bible.txt");
 
 
-type BibleMap = HashMap<u8, Vec<usize>>;
+type BibleMap = HashMap<u8, Vec<u32>>;
 
 #[cfg(test)]
 mod tests {
@@ -30,7 +30,7 @@ mod tests {
         // TODO: Refactor to use bytes for O(1) indexing
         for (key, vals) in map.iter() {
             for val in vals {
-                assert_eq!(key, &BIBLE.as_bytes()[*val]);
+                assert_eq!(key, &BIBLE.as_bytes()[*val as usize]);
             }
         }
     }
@@ -42,7 +42,7 @@ mod tests {
         let encrypted = bc.encrypt('h' as u8).unwrap();
 
         // decrypt
-        let mut array = [0; 8];
+        let mut array = [0; 4];
         array.copy_from_slice(&encrypted);
         let decrypted = bc.decrypt(array);
 
@@ -55,8 +55,8 @@ fn biblemap_new() -> BibleMap {
     let mut map: BibleMap = HashMap::new();
     for (i, c) in BIBLE.bytes().enumerate() {
         match map.get_mut(&c) {
-            Some(v) => v.push(i),
-            None => {map.insert(c, vec![i]);},
+            Some(v) => v.push(i as u32),
+            None => {map.insert(c, vec![i as u32]);},
         };
     }
     map
@@ -76,7 +76,7 @@ impl BibleCipher {
     }
 
     /// Encrypt b using the bible, if b is not in the bible None will be returned.
-    fn encrypt(&mut self, b: u8) -> Option<[u8; 8]> {
+    fn encrypt(&mut self, b: u8) -> Option<[u8; 4]> {
         match self.map.get(&b) {
             Some(v) => {
                 let idx = v.choose(&mut self.rng).unwrap();
@@ -86,11 +86,11 @@ impl BibleCipher {
         }
     }
 
-    fn decrypt(&self, chunk: [u8; 8]) -> u8 {
+    fn decrypt(&self, chunk: [u8; 4]) -> u8 {
         // let chunk = [chunk, &[0,0,0,0]].concat();
 
-        let idx: usize = usize::from_le_bytes(chunk);
-        BIBLE.as_bytes()[idx]
+        let idx: u32 = u32::from_le_bytes(chunk);
+        BIBLE.as_bytes()[idx as usize]
     }
 }
 
@@ -126,7 +126,7 @@ fn main() -> io::Result<()> {
                     .collect::<Vec<u8>>()
                     .chunks(8) {
 
-                    let mut array = [0; 8];
+                    let mut array = [0; 4];
                     array.copy_from_slice(&chunk);
                     bc.decrypt(array);
                }
